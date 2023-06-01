@@ -1,24 +1,23 @@
 use std::{collections::BTreeMap, fmt::Display};
 
-use serde::Deserialize;
 use reqwest::IntoUrl;
 use serde_xmlrpc::{request_to_string, response_from_str, Value};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum RequestError {
+pub enum RequestError {
     #[error(transparent)]
     XmlRpcError(#[from] serde_xmlrpc::Error),
     #[error(transparent)]
     HttpError(#[from] reqwest::Error),
 }
 
-struct Request<M: Into<String>> {
+struct Request<M: AsRef<str>> {
     method: M,
     args: Vec<Value>,
 }
 
-impl<M: Into<String>> Request<M> {
+impl<M: AsRef<str>> Request<M> {
     fn new(method: M) -> Self {
         Self {
             method,
@@ -31,52 +30,51 @@ impl<M: Into<String>> Request<M> {
         self
     }
 
-    fn send<'a, U, T>(self, url: U) -> Result<T, RequestError>
+    fn send<U>(self, url: U) -> String
     where
         U: IntoUrl,
-        T: Deserialize<'a>
     {
-        let body = request_to_string(&self.method.into(), self.args).unwrap();
-        let text = reqwest::blocking::Client::new() 
+        let body = request_to_string(self.method.as_ref(), self.args).unwrap();
+        reqwest::blocking::Client::new() 
             .post(url)
             .body(body)
-            .send()?
-            .text()?;
-        let response = response_from_str::<T>(&text)?;
-        Ok(response)
+            .send().unwrap()
+            .text().unwrap()
     }
 }
 
 #[derive(Clone)]
-pub struct Client<T: Into<String> + Display> {
+pub struct Client<T: AsRef<str> + Display + Clone> {
     db: T,
     password: T,
     uid: i32,
-    url: T,
+    url: String,
     env: T,
     records: Vec<Value>,
 }
 
-impl<'a, T> Client<T> where Value: From<T>, T: Into<String> + From<String> + Display + Clone {
+impl<T> Client<T> where Value: From<T>, T: AsRef<str> + Display + Clone {
     pub fn new(
         db: T,
         username: T,
         password: T,
-        url: T,
+        env: T,
+        url: String,
     ) -> Result<Self, RequestError> {
-        let uid = Request::new("authenticate")
+        let resp = Request::new("authenticate")
             .arg(db.clone())
             .arg(username)
             .arg(password.clone())
             .arg(Value::Nil)
-            .send(format!("{}/xmlrpc/2/common", url))?;
+            .send(format!("{}/xmlrpc/2/common", url));
+        let uid = response_from_str::<i32>(&resp).unwrap();
 
         Ok(Self {
             db,
             password,
             uid,
-            url: format!("{}/xmlrpc/2/object", url).into(),
-            env: String::from("res.users").into(),
+            url: format!("{}/xmlrpc/2/object", url),
+            env,
             records: vec![],
         })
     }
@@ -86,10 +84,10 @@ impl<'a, T> Client<T> where Value: From<T>, T: Into<String> + From<String> + Dis
         self
     }
 
-    // pub fn browse(mut self, id: i32) -> Self {
-    //     self.records = vec![Value::from(id)];
-    //     self
-    // }
+    pub fn browse(mut self, id: i32) -> Self {
+        self.records = vec![Value::Int(id); 1];
+        self
+    }
 
     // pub fn create(&mut self, data: impl Serialize) -> Result<&mut Self, reqwest::Error> {
     //     let url = self.url.clone();
@@ -149,27 +147,17 @@ impl<'a, T> Client<T> where Value: From<T>, T: Into<String> + From<String> + Dis
     //     Ok(resp)
     // }
 
-    fn execute(&self, method: &str) -> Request<&str> {
+    fn _execute(&self, method: &str) -> Request<&str> {
         Request::new("execute_kw")
-            .arg(self.db)
+            .arg(self.db.clone())
             .arg(self.uid)
-            .arg(self.password)
-            .arg(self.env)
+            .arg(self.password.clone())
+            .arg(self.env.clone())
             .arg(method)
-        // Request {
-        //     method: "execute_kw".into(),
-        //     args: vec![
-        //         Value::from(self.db.clone()),
-        //         Value::from(self.uid.as_i32().unwrap()),
-        //         Value::from(self.password.clone()),
-        //         Value::from(self.env.clone()),
-        //         Value::from(method),
-        //     ],
-        // }
     }
 }
 
-impl<T: Into<String> + Display> Display for Client<T> {
+impl<T: AsRef<str> + Display + Clone> Display for Client<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

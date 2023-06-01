@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt::Display};
 
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use reqwest::IntoUrl;
 use serde_xmlrpc::{request_to_string, response_from_str, Value};
 use thiserror::Error;
@@ -31,7 +31,7 @@ impl<M: Into<String>> Request<M> {
         self
     }
 
-    fn send<'a, U, T>(&self, url: U) -> Result<T, RequestError>
+    fn send<'a, U, T>(self, url: U) -> Result<T, RequestError>
     where
         U: IntoUrl,
         T: Deserialize<'a>
@@ -48,7 +48,7 @@ impl<M: Into<String>> Request<M> {
 }
 
 #[derive(Clone)]
-pub struct Client<T: Into<String>> {
+pub struct Client<T: Into<String> + Display> {
     db: T,
     password: T,
     uid: i32,
@@ -57,7 +57,7 @@ pub struct Client<T: Into<String>> {
     records: Vec<Value>,
 }
 
-impl<'a, T: Into<String> + From<&'a str>> Client<T> {
+impl<'a, T> Client<T> where Value: From<T>, T: Into<String> + From<String> + Display + Clone {
     pub fn new(
         db: T,
         username: T,
@@ -65,9 +65,9 @@ impl<'a, T: Into<String> + From<&'a str>> Client<T> {
         url: T,
     ) -> Result<Self, RequestError> {
         let uid = Request::new("authenticate")
-            .arg(db)
+            .arg(db.clone())
             .arg(username)
-            .arg(password)
+            .arg(password.clone())
             .arg(Value::Nil)
             .send(format!("{}/xmlrpc/2/common", url))?;
 
@@ -75,8 +75,8 @@ impl<'a, T: Into<String> + From<&'a str>> Client<T> {
             db,
             password,
             uid,
-            url: format!("{}/xmlrpc/2/object", url),
-            env: "res.users".into(),
+            url: format!("{}/xmlrpc/2/object", url).into(),
+            env: String::from("res.users").into(),
             records: vec![],
         })
     }
@@ -86,10 +86,10 @@ impl<'a, T: Into<String> + From<&'a str>> Client<T> {
         self
     }
 
-    pub fn browse(mut self, id: i32) -> Self {
-        self.records = vec![Value::from(id)];
-        self
-    }
+    // pub fn browse(mut self, id: i32) -> Self {
+    //     self.records = vec![Value::from(id)];
+    //     self
+    // }
 
     // pub fn create(&mut self, data: impl Serialize) -> Result<&mut Self, reqwest::Error> {
     //     let url = self.url.clone();
@@ -169,7 +169,7 @@ impl<'a, T: Into<String> + From<&'a str>> Client<T> {
     }
 }
 
-impl<T: Into<String>> Display for Client<T> {
+impl<T: Into<String> + Display> Display for Client<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

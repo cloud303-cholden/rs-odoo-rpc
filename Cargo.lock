@@ -740,8 +740,7 @@ dependencies = [
 [[package]]
 name = "serde_xmlrpc"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a32874416bed46dd6ddb823440c2854b06f413a6ba23db784f418db1e572381"
+source = "git+https://github.com/cloud303-cholden/serde-xmlrpc.git#e717ecb786a13acc27ed8b131551858b9a39e56c"
 dependencies = [
  "anyhow",
  "base64 0.21.2",

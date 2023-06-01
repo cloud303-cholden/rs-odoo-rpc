@@ -1,7 +1,16 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::fmt::Display;
 
 use reqwest::IntoUrl;
-use serde_xmlrpc::{request_to_string, response_from_str, Value};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use serde_xmlrpc::{
+    request_to_string,
+    response_from_str,
+    to_value,
+    Value,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -10,6 +19,8 @@ pub enum RequestError {
     XmlRpcError(#[from] serde_xmlrpc::Error),
     #[error(transparent)]
     HttpError(#[from] reqwest::Error),
+    #[error("Unknown error")]
+    Unknown,
 }
 
 struct Request<M: AsRef<str>> {
@@ -30,21 +41,27 @@ impl<M: AsRef<str>> Request<M> {
         self
     }
 
-    fn send<U>(self, url: U) -> String
+    fn send<'a, T, U>(self, url: U) -> Result<T, RequestError>
     where
+        T: Deserialize<'a>,
         U: IntoUrl,
     {
-        let body = request_to_string(self.method.as_ref(), self.args).unwrap();
-        reqwest::blocking::Client::new() 
+        let body = request_to_string(self.method.as_ref(), self.args)?;
+        let resp = reqwest::blocking::Client::new() 
             .post(url)
             .body(body)
-            .send().unwrap()
-            .text().unwrap()
+            .send()?
+            .text()?;
+        dbg!(&resp);
+        Ok(response_from_str::<T>(resp)?)
     }
 }
 
 #[derive(Clone)]
-pub struct Client<T: AsRef<str> + Display + Clone> {
+pub struct Client<T>
+where
+    T: AsRef<str> + Display + Clone
+{
     db: T,
     password: T,
     uid: i32,
@@ -53,7 +70,11 @@ pub struct Client<T: AsRef<str> + Display + Clone> {
     records: Vec<Value>,
 }
 
-impl<T> Client<T> where Value: From<T>, T: AsRef<str> + Display + Clone {
+impl<T> Client<T>
+where
+    Value: From<T>,
+    T: AsRef<str> + Display + Clone,
+{
     pub fn new(
         db: T,
         username: T,
@@ -61,13 +82,12 @@ impl<T> Client<T> where Value: From<T>, T: AsRef<str> + Display + Clone {
         env: T,
         url: String,
     ) -> Result<Self, RequestError> {
-        let resp = Request::new("authenticate")
+        let uid = Request::new("authenticate")
             .arg(db.clone())
             .arg(username)
             .arg(password.clone())
             .arg(Value::Nil)
-            .send(format!("{}/xmlrpc/2/common", url));
-        let uid = response_from_str::<i32>(&resp).unwrap();
+            .send::<i32, _>(format!("{}/xmlrpc/2/common", url))?;
 
         Ok(Self {
             db,
@@ -84,7 +104,7 @@ impl<T> Client<T> where Value: From<T>, T: AsRef<str> + Display + Clone {
         self
     }
 
-    pub fn browse(mut self, id: i32) -> Self {
+    pub fn browse(&mut self, id: i32) -> &mut Self {
         self.records = vec![Value::Int(id); 1];
         self
     }
@@ -147,13 +167,39 @@ impl<T> Client<T> where Value: From<T>, T: AsRef<str> + Display + Clone {
     //     Ok(resp)
     // }
 
-    fn _execute(&self, method: &str) -> Request<&str> {
+    pub fn get<'a, F>(&mut self, field: &str) -> Result<F, RequestError>
+    where
+        F: Deserialize<'a>,
+    {
+        let resp = self.execute("read")
+            .arg(Value::Array(self.records.clone()))
+            .arg(
+                to_value(Get::new(field.to_string()))?
+            )
+            .send::<Vec<F>, _>(self.url.clone())?;
+        resp.into_iter().next().ok_or(RequestError::Unknown)
+    }
+
+    fn execute(&self, method: &str) -> Request<&str> {
         Request::new("execute_kw")
             .arg(self.db.clone())
             .arg(self.uid)
             .arg(self.password.clone())
             .arg(self.env.clone())
             .arg(method)
+    }
+}
+
+#[derive(Serialize)]
+struct Get {
+    fields: Vec<String>,
+}
+
+impl Get {
+    fn new(field: String) -> Self {
+        Self {
+            fields: vec![field; 1],
+        }
     }
 }
 
@@ -168,14 +214,5 @@ impl<T: AsRef<str> + Display + Clone> Display for Client<T> {
                 .map(|c| format!("{},", c.as_i32().unwrap()))
                 .collect::<String>()
         )
-    }
-}
-
-pub struct Data(pub Value);
-
-impl<const N: usize> From<[(String, Value); N]> for Data {
-    fn from(mut arr: [(String, Value); N]) -> Self {
-        arr.sort_by(|a, b| a.0.cmp(&b.0));
-        Data(Value::Struct(BTreeMap::from(arr)))
     }
 }

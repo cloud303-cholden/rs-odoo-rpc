@@ -30,28 +30,22 @@ impl Client {
                     "args": [db, username, password],
                 }
             }))
-            .send()
-            .await?
-            .json::<Value>()
-            .await?
-            .get("result")
-            .ok_or("Failed to get login result")?
-            .as_u64()
-            .ok_or("Failed to interpret user ID")?;
-
-        dbg!(&uid);
+            .send().await?
+            .json::<Value>().await?
+            .get("result").ok_or("Failed to get login result")?
+            .as_u64().ok_or("Failed to interpret user ID")?;
 
         Ok(Self {
             db,
             password,
-            uid: 2,
+            uid,
             env,
             url: format!("{}/jsonrpc", url),
             records: vec![],
         })
     }
 
-    pub fn env(mut self, env: String) -> Self {
+    pub fn env(&mut self, env: String) -> &mut Self {
         self.env = env;
         self
     }
@@ -61,13 +55,156 @@ impl Client {
         self
     }
 
-    pub fn create(&mut self) {}
+    pub async fn create(&mut self, data: Value) -> Result<&mut Self, Box<dyn std::error::Error>> {
+        let resp = reqwest::Client::new()
+            .post(self.url.clone())
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute",
+                    "args": [
+                        self.db,
+                        self.uid,
+                        self.password,
+                        self.env,
+                        "create",
+                        [data],
+                    ],
+                },
+            }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        dbg!(&resp);
 
-    pub fn write(&mut self) {}
+        let resp = resp
+            .get("result").ok_or("Failed to get read result")?
+            .as_array().ok_or("Failed to interpret read result")?
+            .iter()
+            .next().ok_or("Failed to find any records")?
+            .clone();
+        dbg!(&resp);
+        self.records = vec![resp; 1];
+        Ok(self)
+    }
 
-    pub fn search(&mut self) {}
+    pub async fn write(&mut self, data: Value) -> Result<&mut Self, Box<dyn std::error::Error>> {
+        let resp = reqwest::Client::new()
+            .post(self.url.clone())
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute",
+                    "args": [
+                        self.db,
+                        self.uid,
+                        self.password,
+                        self.env,
+                        "write",
+                        self.records,
+                        data,
+                    ],
+                },
+            }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        dbg!(&resp);
+        Ok(self)
+    }
 
-    pub fn read(&mut self) {}
+    pub async fn search(&mut self, domain: Value) -> Result<&mut Self, Box<dyn std::error::Error>> {
+        let resp = reqwest::Client::new()
+            .post(self.url.clone())
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute",
+                    "args": [
+                        self.db,
+                        self.uid,
+                        self.password,
+                        self.env,
+                        "search",
+                        domain,
+                    ],
+                },
+            }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        dbg!(&resp);
+        self.records = resp
+            .get("result").ok_or("Failed to get read result")?
+            .as_array().ok_or("Failed to interpret result as array")?
+            .to_vec();
+        Ok(self)
+    }
+
+    pub async fn read(&mut self, fields: Value) -> Result<Value, Box<dyn std::error::Error>> {
+        let resp = reqwest::Client::new()
+            .post(self.url.clone())
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute",
+                    "args": [
+                        self.db,
+                        self.uid,
+                        self.password,
+                        self.env,
+                        "read",
+                        self.records,
+                        fields,
+                    ],
+                },
+            }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        dbg!(&resp);
+        Ok(resp)
+    }
+
+    pub async fn search_read(&mut self, domain: Value, fields: Value) -> Result<Value, Box<dyn std::error::Error>> {
+        let resp = reqwest::Client::new()
+            .post(self.url.clone())
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute",
+                    "args": [
+                        self.db,
+                        self.uid,
+                        self.password,
+                        self.env,
+                        "search_read",
+                        domain,
+                        fields,
+                    ],
+                },
+            }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        dbg!(&resp);
+        Ok(resp)
+    }
 
     pub async fn get(&mut self, field: &str) -> Result<Value, Box<dyn std::error::Error>> {
         let resp = reqwest::Client::new()
@@ -93,32 +230,46 @@ impl Client {
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         let resp = resp
-            .get("result")
-            .ok_or("Failed to get read result")?
-            .as_array()
-            .ok_or("Failed to interpret read result")?
+            .get("result").ok_or("Failed to get read result")?
+            .as_array().ok_or("Failed to interpret read result")?
             .iter()
-            .next()
-            .ok_or("Failed to find any records")?
-            .get(field)
-            .ok_or("Read field not included in result")?
+            .next().ok_or("Failed to find any records")?
+            .get(field).ok_or("Read field not included in result")?
             .clone();
-        dbg!(&resp);
         Ok(resp)
     }
 
-    fn execute(&self, method: &str) -> () {}
-    // fn execute(&self, method: &str) -> Request<&str> {
-    //     Request::new("execute_kw")
-    //         .arg(self.db.clone())
-    //         .arg(self.uid)
-    //         .arg(self.password.clone())
-    //         .arg(self.env.clone())
-    //         .arg(method)
-    // }
+    pub async fn unlink(&mut self) -> Result<&mut Self, Box<dyn std::error::Error>> {
+        let resp = reqwest::Client::new()
+            .post(self.url.clone())
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute",
+                    "args": [
+                        self.db,
+                        self.uid,
+                        self.password,
+                        self.env,
+                        "unlink",
+                        self.records,
+                    ],
+                },
+            }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+        dbg!(&resp);
+        self.records = vec![];
+        Ok(self)
+    }
+
+    fn _execute(&self, _method: &str) {}
 }
 
 impl Display for Client {

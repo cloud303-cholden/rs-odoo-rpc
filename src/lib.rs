@@ -4,8 +4,15 @@ use reqwest::IntoUrl;
 use serde::Serialize;
 use serde_json::{Value, json};
 
+type BuilderResult<'a, T, U> = Result<&'a mut Client<T, U>, Box<dyn std::error::Error>>;
+type ValueResult = Result<Value, Box<dyn std::error::Error>>;
+
 #[derive(Serialize)]
-pub struct Client<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> {
+pub struct Client<T, U>
+where
+    T: Display + serde::ser::Serialize,
+    U: IntoUrl + Copy + Display,
+{
     db: T,
     password: T,
     uid: u64,
@@ -14,7 +21,11 @@ pub struct Client<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Displa
     records: Vec<Value>,
 }
 
-impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, U> {
+impl<T, U> Client<T, U>
+where
+    T: Display + serde::ser::Serialize,
+    U: IntoUrl + Copy + Display,
+{
     pub async fn new(
         db: T,
         username: T,
@@ -58,7 +69,7 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
         self
     }
 
-    pub async fn create(&mut self, data: Value) -> Result<&mut Self, Box<dyn std::error::Error>> {
+    pub async fn create(&mut self, data: Value) -> BuilderResult<T, U> {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -89,12 +100,11 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .iter()
             .next().ok_or("Failed to find any records")?
             .clone();
-        dbg!(&resp);
         self.records = vec![resp; 1];
         Ok(self)
     }
 
-    pub async fn write(&mut self, data: Value) -> Result<&mut Self, Box<dyn std::error::Error>> {
+    pub async fn write(&mut self, data: Value) -> BuilderResult<T, U> {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -119,10 +129,11 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .json::<Value>()
             .await?;
         dbg!(&resp);
+
         Ok(self)
     }
 
-    pub async fn search(&mut self, domain: Value) -> Result<&mut Self, Box<dyn std::error::Error>> {
+    pub async fn search(&mut self, domain: Value) -> BuilderResult<T, U> {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -146,6 +157,7 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .json::<Value>()
             .await?;
         dbg!(&resp);
+
         self.records = resp
             .get("result").ok_or("Failed to get read result")?
             .as_array().ok_or("Failed to interpret result as array")?
@@ -153,7 +165,7 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
         Ok(self)
     }
 
-    pub async fn read(&mut self, fields: Value) -> Result<Value, Box<dyn std::error::Error>> {
+    pub async fn read(&mut self, fields: Value) -> ValueResult {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -178,10 +190,11 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .json::<Value>()
             .await?;
         dbg!(&resp);
+
         Ok(resp)
     }
 
-    pub async fn search_read(&mut self, domain: Value, fields: Value) -> Result<Value, Box<dyn std::error::Error>> {
+    pub async fn search_read(&mut self, domain: Value, fields: Value) -> ValueResult {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -206,10 +219,11 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .json::<Value>()
             .await?;
         dbg!(&resp);
+
         Ok(resp)
     }
 
-    pub async fn get(&mut self, field: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    pub async fn get(&mut self, field: &str) -> ValueResult {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -233,6 +247,7 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .await?
             .json::<Value>()
             .await?;
+        dbg!(&resp);
 
         let resp = resp
             .get("result").ok_or("Failed to get read result")?
@@ -244,7 +259,7 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
         Ok(resp)
     }
 
-    pub async fn unlink(&mut self) -> Result<&mut Self, Box<dyn std::error::Error>> {
+    pub async fn unlink(&mut self) -> BuilderResult<T, U> {
         let resp = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
@@ -268,6 +283,7 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
             .json::<Value>()
             .await?;
         dbg!(&resp);
+
         self.records = vec![];
         Ok(self)
     }
@@ -275,7 +291,11 @@ impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Client<T, 
     fn _execute(&self, _method: &str) {}
 }
 
-impl<T: Display + serde::ser::Serialize, U: IntoUrl + Copy + Display> Display for Client<T, U> {
+impl<T, U> Display for Client<T, U>
+where
+    T: Display + serde::ser::Serialize,
+    U: IntoUrl + Copy + Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

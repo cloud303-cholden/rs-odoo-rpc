@@ -64,9 +64,17 @@ where
         self
     }
 
-    pub fn browse(&mut self, id: u64) -> &mut Self {
-        self.records = vec![serde_json::to_value(id).unwrap(); 1];
+    pub fn browse<I: Into<Value>>(&mut self, ids: I) -> &mut Self {
+        self.records = match ids.into() {
+            Value::Array(i) => i,
+            Value::Number(i) => vec![Value::Number(i); 1],
+            _ => unreachable!(),
+        };
         self
+    }
+
+    pub fn ids(&self) -> Vec<Value> {
+        self.records.clone()
     }
 
     pub async fn create(&mut self, data: Value) -> BuilderResult<T, U> {

@@ -84,7 +84,7 @@ where
                         self.password,
                         self.env,
                         "create",
-                        [data],
+                        data,
                     ],
                 },
             }))
@@ -96,11 +96,8 @@ where
 
         let resp = resp
             .get("result").ok_or("Failed to get read result")?
-            .as_array().ok_or("Failed to interpret read result")?
-            .iter()
-            .next().ok_or("Failed to find any records")?
-            .clone();
-        self.records = vec![resp; 1];
+            .as_array().ok_or("Failed to interpret read result")?;
+        self.records = resp.to_vec();
         Ok(self)
     }
 

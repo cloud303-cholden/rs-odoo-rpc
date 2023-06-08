@@ -100,7 +100,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         let resp = resp
             .get("result").ok_or("Failed to get read result")?
@@ -133,7 +132,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         Ok(self)
     }
@@ -161,7 +159,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         self.records = resp
             .get("result").ok_or("Failed to get read result")?
@@ -194,7 +191,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         Ok(resp)
     }
@@ -223,7 +219,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         Ok(resp)
     }
@@ -252,7 +247,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         let resp = resp
             .get("result").ok_or("Failed to get read result")?
@@ -287,7 +281,6 @@ where
             .await?
             .json::<Value>()
             .await?;
-        dbg!(&resp);
 
         self.records = vec![];
         Ok(self)

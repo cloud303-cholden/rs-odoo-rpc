@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 type BuilderResult<'a, T, U> = Result<&'a mut Client<T, U>, Box<dyn std::error::Error>>;
 type ValueResult = Result<Value, Box<dyn std::error::Error>>;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Client<T, U>
 where
     T: Display + serde::ser::Serialize,

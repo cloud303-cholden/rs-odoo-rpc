@@ -11,7 +11,7 @@ type ValueResult = Result<Value, Box<dyn std::error::Error>>;
 pub struct Client<T, U>
 where
     T: Display + serde::ser::Serialize,
-    U: IntoUrl + Copy + Display,
+    U: IntoUrl + Display,
 {
     db: T,
     password: T,
@@ -24,7 +24,7 @@ where
 impl<T, U> Client<T, U>
 where
     T: Display + serde::ser::Serialize,
-    U: IntoUrl + Copy + Display,
+    U: IntoUrl + Display,
 {
     pub async fn new(
         db: T,
@@ -109,7 +109,7 @@ where
     }
 
     pub async fn write(&mut self, data: Value) -> BuilderResult<T, U> {
-        let resp = reqwest::Client::new()
+        let _ = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -259,7 +259,7 @@ where
     }
 
     pub async fn unlink(&mut self) -> BuilderResult<T, U> {
-        let resp = reqwest::Client::new()
+        let _ = reqwest::Client::new()
             .post(format!("{}/jsonrpc", self.url))
             .json(&json!({
                 "jsonrpc": "2.0",

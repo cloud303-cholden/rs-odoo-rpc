@@ -101,10 +101,12 @@ where
             .json::<Value>()
             .await?;
 
-        let resp = resp
-            .get("result").ok_or("Failed to get read result")?
-            .as_array().ok_or("Failed to interpret read result")?;
-        self.records = resp.to_vec();
+        self.records = match resp.get("result").ok_or("Failed to get read result")? {
+            Value::Array(val) => val.to_vec(),
+            Value::Number(val) => vec![serde_json::to_value(val).unwrap()],
+            _ => unimplemented!(),
+        };
+        
         Ok(self)
     }
 

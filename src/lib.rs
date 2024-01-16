@@ -1,11 +1,12 @@
 use std::fmt::Display;
 
+use anyhow::{Result, Context};
 use reqwest::IntoUrl;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-type BuilderResult<'a, T, U> = Result<&'a mut Client<T, U>, Box<dyn std::error::Error>>;
-type ValueResult = Result<Value, Box<dyn std::error::Error>>;
+type BuilderResult<'a, T, U> = Result<&'a mut Client<T, U>>;
+type ValueResult = Result<Value>;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct Client<T, U>
@@ -32,7 +33,7 @@ where
         password: T,
         env: T,
         url: U,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self> {
         let uid: u64 = reqwest::Client::new()
             .post(format!("{}/jsonrpc", url))
             .json(&json!({
@@ -46,8 +47,8 @@ where
             }))
             .send().await?
             .json::<Value>().await?
-            .get("result").ok_or("Failed to get login result")?
-            .as_u64().ok_or("Failed to interpret user ID")?;
+            .get("result").context("Failed to get login result")?
+            .as_u64().context("Failed to interpret user ID")?;
 
         Ok(Self {
             db,
@@ -101,7 +102,7 @@ where
             .json::<Value>()
             .await?;
 
-        self.records = match resp.get("result").ok_or("Failed to get read result")? {
+        self.records = match resp.get("result").context("Failed to get read result")? {
             Value::Array(val) => val.to_vec(),
             Value::Number(val) => vec![serde_json::to_value(val).unwrap()],
             _ => unimplemented!(),
@@ -163,8 +164,8 @@ where
             .await?;
 
         self.records = resp
-            .get("result").ok_or("Failed to get read result")?
-            .as_array().ok_or("Failed to interpret result as array")?
+            .get("result").context("Failed to get read result")?
+            .as_array().context("Failed to interpret result as array")?
             .to_vec();
         Ok(self)
     }
@@ -251,11 +252,11 @@ where
             .await?;
 
         let resp = resp
-            .get("result").ok_or("Failed to get read result")?
-            .as_array().ok_or("Failed to interpret read result")?
+            .get("result").context("Failed to get read result")?
+            .as_array().context("Failed to interpret read result")?
             .iter()
-            .next().ok_or("Failed to find any records")?
-            .get(field).ok_or("Read field not included in result")?
+            .next().context("Failed to find any records")?
+            .get(field).context("Read field not included in result")?
             .clone();
         Ok(resp)
     }

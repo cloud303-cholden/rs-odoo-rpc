@@ -1,48 +1,44 @@
 use std::fmt::Display;
 
 use anyhow::{Result, Context};
-use reqwest::IntoUrl;
+use itertools::Itertools;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-type BuilderResult<'a, T, U> = Result<&'a mut Client<T, U>>;
+type BuilderResult<'a, S> = Result<&'a mut Client<S>>;
 type ValueResult = Result<Value>;
 
 #[derive(Serialize, Debug, Clone)]
-pub struct Client<T, U>
-where
-    T: Display + serde::ser::Serialize,
-    U: IntoUrl + Display,
+pub struct Client<S>
 {
-    db: T,
-    password: T,
+    db: S,
+    password: S,
     uid: u64,
-    url: U,
-    env: T,
+    url: S,
+    env: S,
     records: Vec<Value>,
 }
 
-impl<T, U> Client<T, U>
+impl<S> Client<S>
 where
-    T: Display + serde::ser::Serialize,
-    U: IntoUrl + Display,
+    S: Into<String> + Clone,
 {
     pub async fn new(
-        db: T,
-        username: T,
-        password: T,
-        env: T,
-        url: U,
+        db: S,
+        username: S,
+        password: S,
+        env: S,
+        url: S,
     ) -> Result<Self> {
         let uid: u64 = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", url))
+            .post(format!("{}/jsonrpc", url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
                     "service": "common",
                     "method": "login",
-                    "args": [db, username, password],
+                    "args": [db.clone().into(), username.clone().into(), password.clone().into()],
                 }
             }))
             .send().await?
@@ -60,7 +56,7 @@ where
         })
     }
 
-    pub fn env(&mut self, env: T) -> &mut Self {
+    pub fn env(&mut self, env: S) -> &mut Self {
         self.env = env;
         self
     }
@@ -78,9 +74,9 @@ where
         self.records.clone()
     }
 
-    pub async fn create(&mut self, data: Value) -> BuilderResult<T, U> {
+    pub async fn create(&mut self, data: Value) -> BuilderResult<S> {
         let resp = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -88,10 +84,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "create",
                         data,
                     ],
@@ -111,9 +107,9 @@ where
         Ok(self)
     }
 
-    pub async fn write(&mut self, data: Value) -> BuilderResult<T, U> {
+    pub async fn write(&mut self, data: Value) -> BuilderResult<S> {
         let _ = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -121,10 +117,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "write",
                         self.records,
                         data,
@@ -139,9 +135,9 @@ where
         Ok(self)
     }
 
-    pub async fn search(&mut self, domain: Value) -> BuilderResult<T, U> {
+    pub async fn search(&mut self, domain: Value) -> BuilderResult<S> {
         let resp = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -149,10 +145,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "search",
                         domain,
                     ],
@@ -172,7 +168,7 @@ where
 
     pub async fn read(&mut self, fields: Value) -> ValueResult {
         let resp = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -180,10 +176,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "read",
                         self.records,
                         fields,
@@ -200,7 +196,7 @@ where
 
     pub async fn search_read(&mut self, domain: Value, fields: Value) -> ValueResult {
         let resp = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -208,10 +204,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "search_read",
                         domain,
                         fields,
@@ -228,7 +224,7 @@ where
 
     pub async fn get(&mut self, field: &str) -> ValueResult {
         let resp = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -236,10 +232,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "read",
                         self.records,
                         [field],
@@ -261,9 +257,9 @@ where
         Ok(resp)
     }
 
-    pub async fn unlink(&mut self) -> BuilderResult<T, U> {
+    pub async fn unlink(&mut self) -> BuilderResult<S> {
         let _ = reqwest::Client::new()
-            .post(format!("{}/jsonrpc", self.url))
+            .post(format!("{}/jsonrpc", self.url.clone().into()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -271,10 +267,10 @@ where
                     "service": "object",
                     "method": "execute",
                     "args": [
-                        self.db,
+                        self.db.clone().into(),
                         self.uid,
-                        self.password,
-                        self.env,
+                        self.password.clone().into(),
+                        self.env.clone().into(),
                         "unlink",
                         self.records,
                     ],
@@ -292,20 +288,30 @@ where
     fn _execute(&self, _method: &str) {}
 }
 
-impl<T, U> Display for Client<T, U>
-where
-    T: Display + serde::ser::Serialize,
-    U: IntoUrl + Copy + Display,
+impl<S> Display for Client<S>
+where S: Into<String> + Clone + Display,
 {
+    #[allow(unstable_name_collisions)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}({})",
-            self.env,
-            self.records
-                .iter()
-                .map(|c| format!("{},", c.as_u64().unwrap()))
-                .collect::<String>()
-        )
+        let mut s: String = self.env.clone().into();
+        s.push('(');
+        let str_records: String = self.records
+            .iter()
+            .flat_map(|r| r.as_u64())
+            .map(|r| r.to_string())
+            .intersperse(", ".to_string())
+            .collect();
+        s.push_str(&str_records);
+        s.push(')');
+        write!(f, "{}", s)
+        // write!(
+        //     f,
+        //     "{}({})",
+        //     self.env,
+        //     self.records
+        //         .iter()
+        //         .map(|c| format!("{},", c.as_u64().unwrap()))
+        //         .collect::<String>()
+        // )
     }
 }

@@ -304,14 +304,5 @@ where S: Into<String> + Clone + Display,
         s.push_str(&str_records);
         s.push(')');
         write!(f, "{}", s)
-        // write!(
-        //     f,
-        //     "{}({})",
-        //     self.env,
-        //     self.records
-        //         .iter()
-        //         .map(|c| format!("{},", c.as_u64().unwrap()))
-        //         .collect::<String>()
-        // )
     }
 }

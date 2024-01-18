@@ -146,13 +146,10 @@ where
             }))
             .send()
             .await?
-            // .json::<Value>()
             .json::<Response<u64>>()
-            .await?;
-        println!("{:?}", resp);
+            .await.context("create failed")?;
 
         self.records = resp.result.into();
-        // self.records = resp.get("result").unwrap();
 
         Ok(self)
     }

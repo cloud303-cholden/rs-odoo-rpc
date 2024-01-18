@@ -17,7 +17,7 @@ pub struct Response<T> {
     pub result: ArrayOrAny<T>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum OdooOption<T> {
     Bool(bool),

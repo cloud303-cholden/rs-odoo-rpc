@@ -17,6 +17,12 @@ async fn main() -> Result<()> {
 
     let _resp: String = client
         .env("res.partner")
+        .browse(vec![1])
+        .get("name")
+        .await?;
+
+    let _resp: String = client
+        .env("res.partner")
         .browse(1)
         .get("name")
         .await?;

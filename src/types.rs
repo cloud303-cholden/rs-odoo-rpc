@@ -82,3 +82,9 @@ impl From<u64> for ArrayOrNumber {
         Self::Number(value)
     }
 }
+
+impl From<Vec<u64>> for ArrayOrNumber {
+    fn from(value: Vec<u64>) -> Self {
+        Self::Array(value)
+    }
+}

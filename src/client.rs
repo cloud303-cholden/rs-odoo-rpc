@@ -146,10 +146,13 @@ where
             }))
             .send()
             .await?
+            // .json::<Value>()
             .json::<Response<u64>>()
             .await?;
+        println!("{:?}", resp);
 
         self.records = resp.result.into();
+        // self.records = resp.get("result").unwrap();
 
         Ok(self)
     }

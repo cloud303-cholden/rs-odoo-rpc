@@ -65,6 +65,13 @@ impl<T> ArrayOrAny<T> {
     pub fn to_records(self) -> Vec<T> {
         self.into()
     }
+
+    pub fn to_record(self) -> Option<T> {
+        match self {
+            Self::Array(mut val) => val.pop(),
+            Self::Any(val) => Some(val),
+        }
+    }
 }
 
 #[allow(clippy::from_over_into)]

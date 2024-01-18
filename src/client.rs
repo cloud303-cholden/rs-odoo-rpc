@@ -78,8 +78,8 @@ where
             None => Env::default(),
         };
         let client = Arc::new(reqwest::Client::new());
-        let uid: u64 = client
-            .post(format!("{:?}/jsonrpc", credentials.url))
+        let resp = client
+            .post(format!("{}/jsonrpc", credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -94,11 +94,11 @@ where
                 },
             }))
             .send().await?
-            .json::<Response<u64>>().await?
+            .json::<Response<u64>>().await?;
+        let uid = resp
             .result
-            .to_records()
-            .pop()
-            .context("login failed")?;
+            .to_record()
+            .unwrap();
 
         Ok(Self {
             client,
@@ -127,7 +127,7 @@ where
 
     pub async fn create(&mut self, data: Value) -> BuilderResult<S, E> {
         let resp = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -156,7 +156,7 @@ where
 
     pub async fn write(&mut self, data: Value) -> BuilderResult<S, E> {
         let _ = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -184,7 +184,7 @@ where
 
     pub async fn search(&mut self, domain: Value) -> BuilderResult<S, E> {
         let resp = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -215,7 +215,7 @@ where
 
     pub async fn read(&mut self, fields: Value) -> ValueResult {
         let resp = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -243,7 +243,7 @@ where
 
     pub async fn search_read(&mut self, domain: Value, fields: Value) -> ValueResult {
         let resp = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -271,7 +271,7 @@ where
 
     pub async fn get<T: DeserializeOwned>(&mut self, field: impl AsRef<str>) -> Result<T> {
         let resp = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -306,7 +306,7 @@ where
 
     pub async fn unlink(&mut self) -> BuilderResult<S, E> {
         let _ = self.client
-            .post(format!("{:?}/jsonrpc", self.credentials.url))
+            .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
                 "method": "call",

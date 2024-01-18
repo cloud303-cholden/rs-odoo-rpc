@@ -1,5 +1,5 @@
 use anyhow::Result;
-use odoorpc::{client::Client, types::Credentials};
+use odoorpc::{Client, Credentials};
 use serde_json::json;
 
 #[tokio::main]

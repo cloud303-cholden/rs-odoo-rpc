@@ -1,11 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use itertools::Itertools;
-use serde::{Serialize, de::DeserializeOwned};
-use serde_json::{Value, json};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{json, Value};
+use tracing::debug;
 
-use crate::types::{Credentials, Response, ArrayOrNumber};
+use crate::types::{ArrayOrNumber, Credentials, Response};
 
 type BuilderResult<'a, S, E> = Result<&'a mut Client<S, E>>;
 type ValueResult = Result<Value>;
@@ -37,7 +38,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s: String = self.env.0.as_ref().to_string();
         s.push('(');
-        let str_records: String = self.records
+        let str_records: String = self
+            .records
             .iter()
             .map(|r| r.to_string())
             .intersperse(", ".to_string())
@@ -69,10 +71,7 @@ where
     E: ClientValues,
     Env<E>: Default,
 {
-    pub async fn new(
-        credentials: Credentials<S>,
-        env: Option<E>,
-    ) -> Result<Self> {
+    pub async fn new(credentials: Credentials<S>, env: Option<E>) -> Result<Self> {
         let env = match env {
             Some(s) => Env(s),
             None => Env::default(),
@@ -93,12 +92,11 @@ where
                     ],
                 },
             }))
-            .send().await?
-            .json::<Response<u64>>().await?;
-        let uid = resp
-            .result
-            .to_record()
-            .unwrap();
+            .send()
+            .await?
+            .json::<Response<u64>>()
+            .await?;
+        let uid = resp.result.to_record().unwrap();
 
         Ok(Self {
             client,
@@ -126,7 +124,8 @@ where
     }
 
     pub async fn create(&mut self, data: Value) -> BuilderResult<S, E> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -147,7 +146,8 @@ where
             .send()
             .await?
             .json::<Response<u64>>()
-            .await.context("create failed")?;
+            .await
+            .context("create failed")?;
 
         self.records = resp.result.into();
 
@@ -155,7 +155,8 @@ where
     }
 
     pub async fn write(&mut self, data: Value) -> BuilderResult<S, E> {
-        let _ = self.client
+        let resp = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -178,12 +179,17 @@ where
             .await?
             .json::<Value>()
             .await?;
+        // if let Some(error) = resp.as_object().unwrap().get("error") {
+        //     return Err(error)
+        // }
+        debug!(?resp);
 
         Ok(self)
     }
 
     pub async fn search(&mut self, domain: Value) -> BuilderResult<S, E> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -207,14 +213,15 @@ where
             .await?;
 
         self.records = resp.result.into();
-            // .get("result").context("Failed to get read result")?
-            // .as_array().context("Failed to interpret result as array")?
-            // .to_vec();
+        // .get("result").context("Failed to get read result")?
+        // .as_array().context("Failed to interpret result as array")?
+        // .to_vec();
         Ok(self)
     }
 
     pub async fn read(&mut self, fields: Value) -> ValueResult {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -242,7 +249,8 @@ where
     }
 
     pub async fn search_read(&mut self, domain: Value, fields: Value) -> ValueResult {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -270,7 +278,8 @@ where
     }
 
     pub async fn get<T: DeserializeOwned>(&mut self, field: impl AsRef<str>) -> Result<T> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
@@ -295,17 +304,22 @@ where
             .await?;
 
         let resp = resp
-            .get("result").context("Failed to get read result")?
-            .as_array().context("Failed to interpret read result")?
+            .get("result")
+            .context("Failed to get read result")?
+            .as_array()
+            .context("Failed to interpret read result")?
             .iter()
-            .next().context("Failed to find any records")?
-            .get(field.as_ref()).context("Read field not included in result")?
+            .next()
+            .context("Failed to find any records")?
+            .get(field.as_ref())
+            .context("Read field not included in result")?
             .clone();
         Ok(serde_json::from_value::<T>(resp)?)
     }
 
     pub async fn unlink(&mut self) -> BuilderResult<S, E> {
-        let _ = self.client
+        let _ = self
+            .client
             .post(format!("{}/jsonrpc", self.credentials.url.as_ref()))
             .json(&json!({
                 "jsonrpc": "2.0",
